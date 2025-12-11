@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Reindirizzamento…</title>
+  <style>
+    body{font-family:system-ui,Helvetica,Arial;display:flex;align-items:center;justify-content:center;height:100vh;background:#f6f8fb;margin:0}
+    .box{background:white;padding:20px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.06);max-width:560px;text-align:center}
+    a{color:#0b74ff}
+  </style>
+</head>
+<body>
+  <div class="box" role="main" aria-live="polite">
+    <h1>Reindirizzamento in corso…</h1>
+    <p>Se il reindirizzamento non parte, clicca <a id="manual" href="/gate.html">qui</a>.</p>
+    <p id="status">Sto recuperando i dati necessari…</p>
+  </div>
+
+  <script>
+    (async function(){
+      const status = document.getElementById('status');
+      try {
+        const res = await fetch('/.netlify/functions/get-default-token', { cache: 'no-store' });
+        if (!res.ok) {
+          status.textContent = 'Impossibile ottenere il token di accesso. Riprova.';
+          console.warn('get-default-token resp', res.status);
+          return;
+        }
+        const j = await res.json();
+        if (!j || !j.token) {
+          status.textContent = 'Nessun token disponibile.';
+          console.warn('get-default-token body', j);
+          return;
+        }
+        const token = encodeURIComponent(j.token);
+        const target = '/gate.html?t=' + token;
+        status.textContent = 'Reindirizzo…';
+        window.location.replace(target);
+      } catch (err) {
+        console.error(err);
+        status.textContent = 'Errore di rete nel reindirizzamento.';
+      }
+    })();
+  </script>
+</body>
+</html>
