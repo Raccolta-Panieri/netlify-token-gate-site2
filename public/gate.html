@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gate - Turnstile</title>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <style>
+    body{font-family:system-ui,Helvetica,Arial;padding:32px;background:#f6f8fb}
+    .card{max-width:700px;margin:0 auto;background:white;padding:24px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.06)}
+    button{background:#0b74ff;color:white;border:none;padding:10px 14px;border-radius:8px;cursor:pointer}
+    #status{margin:10px 0;color:#333}
+    #go { display: none; } /* hidden until captcha success */
+  </style>
+</head>
+<body>
+  <div class="card" role="main" aria-labelledby="headline">
+    <h1 id="headline">Completa il CAPTCHA per essere reindirizzato</h1>
+    <input id="token" type="hidden" />
+    <div id="cf-w" class="cf-turnstile"
+         data-sitekey="0x4AAAAAAB3TlvvuJg_6zXj6"
+         data-callback="onTurnstileSuccess"
+         data-theme="light"></div>
+    <p>
+      <button id="go" aria-live="polite">PROSEGUI</button>
+    </p>
+    <div id="status" aria-live="polite"></div>
+  </div>
+
+  <script>
+    (function(){ const p=new URLSearchParams(location.search); const t=p.get('t'); if(t) document.getElementById('token').value = t; })();
+
+    let turnstileToken = "";
+    const status = document.getElementById('status');
+    const goBtn = document.getElementById('go');
+
+    window.onTurnstileSuccess = function(token) {
+      turnstileToken = token || "";
+      status.textContent = "CAPTCHA completato. Premi 'PROSEGUI' per proseguire.";
+      goBtn.style.display = 'inline-block';
+      goBtn.focus();
+    };
+
+    goBtn.addEventListener('click', async () => {
+      const t = document.getElementById('token').value.trim();
+      if(!t){ status.textContent = "Token mancante: genera prima un token."; return; }
+      if(!turnstileToken){ status.textContent = "Completa prima il CAPTCHA (clicca sul widget)."; return; }
+
+      goBtn.disabled = true;
+      status.textContent = "Verifico...";
+
+      try {
+        const res = await fetch('/.netlify/functions/verify-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ t: t, 'cf-turnstile-response': turnstileToken })
+        });
+
+        const j = await res.json();
+
+        if (res.ok && j.ok && j.url) {
+          status.textContent = "Reindirizzamento in corso…";
+          window.location.href = j.url;
+          return;
+        }
+
+        if (j && j.error) {
+          status.textContent = "Verifica fallita: " + j.error;
+        } else if (j && j.verify) {
+          status.textContent = "Verifica CAPTCHA fallita. Riprova.";
+        } else {
+          status.textContent = "Errore imprevisto. Riprova.";
+        }
+
+      } catch (err) {
+        status.textContent = "Errore di rete. Riprova.";
+      } finally {
+        goBtn.disabled = false;
+        if (window.turnstile && typeof window.turnstile.reset === 'function') {
+          try { window.turnstile.reset(document.getElementById('cf-w')); turnstileToken = ""; } catch(e){ }
+        } else {
+          turnstileToken = "";
+        }
+        goBtn.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
